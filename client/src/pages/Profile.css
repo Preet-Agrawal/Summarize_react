@@ -1,0 +1,148 @@
+.profile-page {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f0f2f5;
+  color: #000000;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+.profile-container {
+  max-width: 1200px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.profile-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 2.5rem;
+  color: white;
+  margin-bottom: 2rem;
+}
+
+.profile-info { display: flex; align-items: center; gap: 2rem; }
+
+.avatar {
+  width: 100px; height: 100px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  color: #667eea;
+  font-weight: bold;
+}
+
+.user-details h1 { font-size: 2rem; margin: 0 0 0.5rem; }
+.user-meta { opacity: 0.9; font-size: 1rem; }
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  text-align: center;
+}
+
+.stat-value { font-size: 2.5rem; font-weight: bold; color: #667eea; margin-bottom: 0.5rem; }
+.stat-label { color: #666; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
+
+.history-section {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.quiz-list { list-style: none; padding: 0; margin: 0; }
+
+.quiz-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  border-left: 4px solid #667eea;
+}
+
+.quiz-date { color: #666; font-size: 0.9rem; margin-bottom: 0.5rem; }
+.quiz-score { font-size: 1.1rem; font-weight: 600; color: #333; }
+
+.score-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  margin-left: 0.5rem;
+  font-weight: 500;
+}
+
+.badge-excellent { background: #d4edda; color: #155724; }
+.badge-good { background: #fff3cd; color: #856404; }
+.badge-practice { background: #f8d7da; color: #721c24; }
+
+.empty-state { text-align: center; padding: 3rem; color: #999; }
+.empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+
+.actions { display: flex; gap: 1rem; margin-top: 2rem; }
+
+.btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 500;
+  transition: transform 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-primary { background: #667eea; color: white; }
+.btn-primary:hover { background: #5a67d8; transform: translateY(-2px); }
+.btn-secondary { background: white; color: #667eea; border: 2px solid #667eea; }
+.btn-secondary:hover { background: #f7f7ff; transform: translateY(-2px); }
+
+@media (max-width: 768px) {
+  .profile-header { padding: 2rem; }
+  .profile-info { flex-direction: column; text-align: center; }
+  .avatar { width: 80px; height: 80px; font-size: 2rem; }
+  .user-details h1 { font-size: 1.5rem; }
+  .stats-grid { grid-template-columns: 1fr; }
+  .history-section { padding: 1.5rem; }
+  .quiz-item { padding: 1rem; }
+  .actions { flex-direction: column; }
+  .btn { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 480px) {
+  .profile-container { padding: 0 0.5rem; margin: 1rem auto; }
+  .profile-header { padding: 1.5rem; border-radius: 12px; }
+  .avatar { width: 70px; height: 70px; font-size: 1.8rem; }
+  .user-details h1 { font-size: 1.3rem; }
+  .user-meta { font-size: 0.9rem; }
+  .stat-card { padding: 1.2rem; }
+  .stat-value { font-size: 2rem; }
+  .stat-label { font-size: 0.85rem; }
+  .history-section { padding: 1.2rem; border-radius: 10px; }
+  .quiz-item { padding: 0.8rem; margin-bottom: 0.8rem; }
+  .quiz-date { font-size: 0.85rem; }
+  .quiz-score { font-size: 1rem; }
+  .score-badge { font-size: 0.8rem; padding: 0.2rem 0.5rem; }
+  .btn { padding: 0.7rem 1.2rem; font-size: 0.95rem; }
+}
+
+@media (max-width: 360px) {
+  .profile-header { padding: 1.2rem; }
+  .avatar { width: 60px; height: 60px; font-size: 1.5rem; }
+  .user-details h1 { font-size: 1.1rem; }
+  .stat-value { font-size: 1.8rem; }
+  .quiz-item { padding: 0.7rem; font-size: 0.9rem; }
+  .btn { padding: 0.6rem 1rem; font-size: 0.9rem; }
+}
