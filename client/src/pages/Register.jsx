@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import Navbar from '../components/Navbar'
 import './Register.css'
 
 export default function Register() {
@@ -41,6 +42,8 @@ export default function Register() {
 
   return (
     <div className="auth-page">
+      <Navbar />
+      <div className="auth-page-content">
       <div className="auth-container">
         <div className="auth-left register-left">
           <h1>Join Story Quiz!</h1>
@@ -125,6 +128,7 @@ export default function Register() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )

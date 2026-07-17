@@ -1,4 +1,59 @@
 /* ===== Home Page ===== */
+
+/* Animated gradient background + floating shapes are Home-only,
+   scoped under .home-page so they never bleed into other routes. */
+.home-page {
+  position: relative;
+}
+
+.home-page::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.7;
+  background: linear-gradient(270deg, #b993d6, #8ca6db, #fbc2eb, #a1c4fd, #b993d6);
+  background-size: 400% 400%;
+  animation: gradientBG 18s ease-in-out infinite;
+}
+
+@keyframes gradientBG {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.floating-shape {
+  position: fixed;
+  z-index: 1;
+  border-radius: 50%;
+  opacity: 0.18;
+  filter: blur(2px);
+  pointer-events: none;
+  animation: floatShape 18s linear infinite;
+}
+
+.floating-shape.shape1 { width: 180px; height: 180px; background: #b993d6; left: 5vw; top: 10vh; animation-delay: 0s; }
+.floating-shape.shape2 { width: 120px; height: 120px; background: #8ca6db; right: 8vw; top: 30vh; animation-delay: 4s; }
+.floating-shape.shape3 { width: 100px; height: 100px; background: #000000; left: 20vw; bottom: 10vh; animation-delay: 8s; }
+.floating-shape.shape4 { width: 140px; height: 140px; background: #a1c4fd; right: 15vw; bottom: 15vh; animation-delay: 12s; }
+
+@keyframes floatShape {
+  0% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-40px) scale(1.08); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Lift Home's real content above the decorative overlay/shapes */
+.home-page .main,
+.home-page .result-section,
+.home-page .summary-container,
+.home-page .quiz-container {
+  position: relative;
+  z-index: 2;
+}
+
 .main {
   min-height: 80vh;
   display: flex;
@@ -7,6 +62,11 @@
   flex-direction: column;
   padding: 0 1rem;
   animation: slideInMain 1.2s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@keyframes slideInMain {
+  from { opacity: 0; transform: translateY(40px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .center-content {
@@ -176,6 +236,18 @@
   padding: 0.3em 1em;
   margin-right: 0.5em;
 }
+
+.difficulty-badge {
+  font-size: 0.95rem;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 0.3em 1em;
+  text-transform: capitalize;
+}
+
+.difficulty-badge.difficulty-easy { background: #d1ffd6; color: #1b5e20; }
+.difficulty-badge.difficulty-medium { background: #f3f0fa; color: #6c63ff; }
+.difficulty-badge.difficulty-hard { background: #ffd1d1; color: #b71c1c; }
 
 .reset-btn {
   background: #ececff;
@@ -373,7 +445,6 @@
 
 .success-notification.show { transform: translateX(0); }
 .success-content { display: flex; align-items: center; gap: 0.5rem; }
-.success-icon { font-size: 1.2rem; }
 .success-text { font-weight: 600; font-size: 0.95rem; }
 
 /* ===== Responsive ===== */
@@ -390,6 +461,10 @@
 }
 
 @media (max-width: 480px) {
+  .floating-shape.shape1 { width: 100px; height: 100px; }
+  .floating-shape.shape2 { width: 80px; height: 80px; }
+  .floating-shape.shape3 { width: 60px; height: 60px; }
+  .floating-shape.shape4 { width: 90px; height: 90px; }
   .main { min-height: auto; padding: 1rem 0.5rem; }
   .center-content { margin-top: 1.5rem; }
   .main-heading { font-size: 1.8rem; margin-bottom: 1rem; padding: 0 0.5rem; }

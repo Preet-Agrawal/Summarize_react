@@ -77,7 +77,7 @@ export default function Profile() {
         </div>
 
         <div className="history-section">
-          <h2 className="section-title"><span>📊</span> Quiz History</h2>
+          <h2 className="section-title">Quiz History</h2>
           {quizResults.length > 0 ? (
             <ul className="quiz-list">
               {quizResults.map((result, i) => (
@@ -91,15 +91,14 @@ export default function Profile() {
             </ul>
           ) : (
             <div className="empty-state">
-              <div className="empty-icon">📝</div>
               <p>No quiz history yet. Start taking quizzes to track your progress!</p>
             </div>
           )}
         </div>
 
         <div className="actions">
-          <Link to="/" className="btn btn-primary"><span>🏠</span> Back to Home</Link>
-          <Link to="/" className="btn btn-secondary"><span>🎯</span> Take a Quiz</Link>
+          <Link to="/" className="btn btn-primary">Back to Home</Link>
+          <Link to="/" className="btn btn-secondary">Take a Quiz</Link>
         </div>
       </div>
     </div>

@@ -43,19 +43,34 @@ export default function Contact() {
 
         <div className="content-grid">
           <div className="card">
-            <div className="card-icon">📚</div>
+            <div className="card-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+              </svg>
+            </div>
             <h2>About Story Quiz</h2>
             <p>Story Quiz is an innovative educational platform that helps students improve their reading comprehension and summarization skills through interactive quizzes and AI-powered content generation.</p>
             <p>Built with cutting-edge technology including React, Node.js, MongoDB, and AI APIs.</p>
           </div>
           <div className="card">
-            <div className="card-icon">🎓</div>
+            <div className="card-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <circle cx="12" cy="12" r="6"/>
+                <circle cx="12" cy="12" r="2"/>
+              </svg>
+            </div>
             <h2>Our Mission</h2>
             <p>To make learning engaging and accessible for students worldwide. We believe in the power of storytelling and interactive learning to enhance educational outcomes.</p>
             <p>Developed by students at IIIT Surat as a 3rd Year project.</p>
           </div>
           <div className="card">
-            <div className="card-icon">🚀</div>
+            <div className="card-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </div>
             <h2>Features</h2>
             <p>
               • AI-powered quiz generation<br/>
@@ -64,24 +79,6 @@ export default function Contact() {
               • User-friendly interface<br/>
               • Mobile responsive design
             </p>
-          </div>
-        </div>
-
-        <div className="team-section">
-          <h2>Meet Our Team</h2>
-          <div className="team-grid">
-            <div className="team-member">
-              <div className="member-avatar">PK</div>
-              <div className="member-name">Preet Kumar</div>
-              <div className="member-role">Backend Developer</div>
-              <div className="member-contact">📱 7004613120</div>
-            </div>
-            <div className="team-member">
-              <div className="member-avatar">PC</div>
-              <div className="member-name">Priyansh Choudhary</div>
-              <div className="member-role">Frontend Developer</div>
-              <div className="member-contact">📱 921619826</div>
-            </div>
           </div>
         </div>
 
@@ -149,7 +146,7 @@ export default function Contact() {
       </div>
 
       <div className="footer">
-        <p>&copy; 2024 Story Quiz. Made with ❤️ by IIIT Surat Students</p>
+        <p>&copy; 2024 Story Quiz. Made with care by IIIT Surat Students</p>
       </div>
     </div>
   )

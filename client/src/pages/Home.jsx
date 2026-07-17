@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 import confetti from 'canvas-confetti'
 import './Home.css'
 
+const DIFFICULTY_LEVELS = ['easy', 'medium', 'hard']
+
 export default function Home() {
-  const { user } = useAuth()
   const navigate = useNavigate()
   const [storyInput, setStoryInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,6 +19,7 @@ export default function Home() {
   const [showResult, setShowResult] = useState(false)
   const [showLoginPopup, setShowLoginPopup] = useState(false)
   const [notification, setNotification] = useState('')
+  const [difficulty, setDifficulty] = useState(null)
 
   const submitStory = async () => {
     if (!storyInput.trim()) { alert('Please enter a story first!'); return }
@@ -41,8 +42,9 @@ export default function Home() {
       setLoading(false)
       setShowResult(true)
       if (data.quiz_id) setCurrentQuizId(data.quiz_id)
+      if (data.difficulty) setDifficulty(data.difficulty)
       parseAndDisplayResult(data.result)
-      showSuccessNotification()
+      showSuccessNotification(data)
     } catch (error) {
       setLoading(false)
       if (error.message.includes('JSON') || error.message.includes('Failed to fetch')) {
@@ -130,21 +132,26 @@ export default function Home() {
     setQuizCompleted(false)
   }
 
-  const showSuccessNotification = () => {
-    setNotification('Quiz generated successfully!')
-    setTimeout(() => setNotification(''), 3000)
+  const showSuccessNotification = (data) => {
+    let message = 'Quiz generated successfully!'
+    if (data?.difficultyChanged) {
+      const wentUp = DIFFICULTY_LEVELS.indexOf(data.difficulty) > DIFFICULTY_LEVELS.indexOf(data.previousDifficulty)
+      message += wentUp ? ' Level up — harder questions ahead.' : ' Difficulty lowered — easier questions ahead.'
+    }
+    setNotification(message)
+    setTimeout(() => setNotification(''), 4000)
   }
 
   const getPerformanceMessage = () => {
-    if (score === 5) return "🎉 Perfect! You're a master of this story!"
-    if (score >= 4) return "🌟 Excellent! You really understood the story well!"
-    if (score >= 3) return "👍 Good job! You have a solid understanding of the story."
-    if (score >= 2) return "📚 Not bad! A bit more attention to detail would help."
-    return "📖 Keep reading! Review the story and try again."
+    if (score === 5) return "Perfect! You're a master of this story!"
+    if (score >= 4) return "Excellent! You really understood the story well!"
+    if (score >= 3) return "Good job! You have a solid understanding of the story."
+    if (score >= 2) return "Not bad! A bit more attention to detail would help."
+    return "Keep reading! Review the story and try again."
   }
 
   return (
-    <>
+    <div className="home-page">
       <div className="floating-shape shape1"></div>
       <div className="floating-shape shape2"></div>
       <div className="floating-shape shape3"></div>
@@ -181,14 +188,19 @@ export default function Home() {
         {showResult && (
           <div className="result-section">
             <div className="summary-container">
-              <h2 className="section-title">📖 Story Summary</h2>
+              <h2 className="section-title">Story Summary</h2>
               <div className="summary-content">{summary}</div>
             </div>
 
             <div className="quiz-container">
               <div className="quiz-header">
-                <h2 className="section-title">🧠 Quiz Time!</h2>
+                <h2 className="section-title">Quiz Time!</h2>
                 <div className="score-display">
+                  {difficulty && (
+                    <span className={`difficulty-badge difficulty-${difficulty}`}>
+                      Difficulty: {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}
+                    </span>
+                  )}
                   <span className="score-text">Score: {score}/5</span>
                   <button className="reset-btn" onClick={resetQuiz}>Reset Quiz</button>
                 </div>
@@ -223,8 +235,8 @@ export default function Home() {
                     {userAnswers[qIdx] !== null && (
                       <div className="feedback">
                         {userAnswers[qIdx] === q.correct
-                          ? <span className="correct-feedback">✅ Correct!</span>
-                          : <span className="incorrect-feedback">❌ Incorrect. The correct answer is {q.correct})</span>
+                          ? <span className="correct-feedback">Correct!</span>
+                          : <span className="incorrect-feedback">Incorrect. The correct answer is {q.correct})</span>
                         }
                       </div>
                     )}
@@ -234,7 +246,7 @@ export default function Home() {
 
               {quizCompleted && (
                 <div className="quiz-results">
-                  <h3>🎉 Quiz Complete!</h3>
+                  <h3>Quiz Complete!</h3>
                   <p className="final-score">Final Score: {score}/5</p>
                   <p className="performance-message">{getPerformanceMessage()}</p>
                 </div>
@@ -248,7 +260,7 @@ export default function Home() {
         <div className="login-popup-overlay show" onClick={e => { if (e.target === e.currentTarget) setShowLoginPopup(false) }}>
           <div className="login-popup">
             <div className="login-popup-header">
-              <h3>🔐 Login Required</h3>
+              <h3>Login Required</h3>
               <button className="close-popup" onClick={() => setShowLoginPopup(false)}>×</button>
             </div>
             <div className="login-popup-content">
@@ -265,11 +277,10 @@ export default function Home() {
       {notification && (
         <div className="success-notification show">
           <div className="success-content">
-            <span className="success-icon">✅</span>
             <span className="success-text">{notification}</span>
           </div>
         </div>
       )}
-    </>
+    </div>
   )
 }

@@ -5,6 +5,7 @@ const MongoStore = require('connect-mongo');
 const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
+const { computeAverageScore, decideDifficulty } = require('./difficulty');
 require('dotenv').config({ path: '../.env' });
 
 const app = express();
@@ -72,10 +73,18 @@ const HUGGINGFACE_QA_URL = 'https://api-inference.huggingface.co/models/google/f
 
 // ========== AI / Quiz Generation ==========
 
-async function generateFreeResponse(storyText) {
+// What "easy/medium/hard" means for question content — injected into the
+// HF prompt, and used to prioritize which fallback questions get picked.
+const DIFFICULTY_INSTRUCTIONS = {
+  easy: 'Ask direct, factual questions whose answers are explicitly stated in the text (e.g. character names, places, simple facts).',
+  medium: 'Ask comprehension questions that require connecting two or more different parts of the story together.',
+  hard: 'Ask inference and analysis questions whose answers are NOT directly stated in the text — the reader must reason about theme, motive, or consequence.'
+};
+
+async function generateFreeResponse(storyText, difficulty = 'medium') {
   try {
     const apiKey = process.env.HUGGINGFACE_API_KEY || '';
-    if (!apiKey) return generateSmartFallback(storyText);
+    if (!apiKey) return generateSmartFallback(storyText, difficulty);
 
     const headers = {
       'Authorization': `Bearer ${apiKey}`,
@@ -102,7 +111,7 @@ async function generateFreeResponse(storyText) {
     } catch (e) { console.error('Summary generation error:', e.message); }
 
     // Step 2: Generate quiz questions
-    const quizPrompt = `Based on this story, create 5 multiple choice questions with 4 options each.\n\nStory: ${storyText.slice(0, 1500)}\n\nGenerate questions that test comprehension of:\n1. Main characters and their roles\n2. Key plot events\n3. Setting and time period\n4. Central conflict or problem\n5. Theme or moral of the story\n\nFormat each question with options A, B, C, D and indicate the correct answer.`;
+    const quizPrompt = `Based on this story, create 5 multiple choice questions with 4 options each.\n\nDifficulty level: ${difficulty.toUpperCase()}\n${DIFFICULTY_INSTRUCTIONS[difficulty]}\n\nStory: ${storyText.slice(0, 1500)}\n\nGenerate questions that test comprehension of:\n1. Main characters and their roles\n2. Key plot events\n3. Setting and time period\n4. Central conflict or problem\n5. Theme or moral of the story\n\nFormat each question with options A, B, C, D and indicate the correct answer.`;
 
     let quizQuestions = [];
     try {
@@ -124,17 +133,17 @@ async function generateFreeResponse(storyText) {
       }
     } catch (e) { console.error('Quiz generation error:', e.message); }
 
-    if (!summary || quizQuestions.length < 5) return generateSmartFallback(storyText);
+    if (!summary || quizQuestions.length < 5) return generateSmartFallback(storyText, difficulty);
 
     const quizFormatted = formatQuizQuestions(quizQuestions);
     return `SUMMARY:\n${summary}\n\n${quizFormatted}`;
   } catch (e) {
     console.error('Error in generateFreeResponse:', e.message);
-    return generateSmartFallback(storyText);
+    return generateSmartFallback(storyText, difficulty);
   }
 }
 
-function generateSmartFallback(storyText) {
+function generateSmartFallback(storyText, difficulty = 'medium') {
   const sentences = storyText.split('.').map(s => s.trim()).filter(Boolean);
   const words = storyText.split(/\s+/);
   const lowerText = storyText.toLowerCase();
@@ -197,59 +206,73 @@ function generateSmartFallback(storyText) {
 
   if (uniqueNames.length >= 2) {
     const others = uniqueNames.slice(1, 4);
-    questions.push({ q: 'Who is the main character in this story?', options: [uniqueNames[0], others[0] || 'John', others[1] || 'Mary', 'The narrator'], correct: 'A' });
+    questions.push({ q: 'Who is the main character in this story?', options: [uniqueNames[0], others[0] || 'John', others[1] || 'Mary', 'The narrator'], correct: 'A', level: 'easy' });
     if (uniqueNames.length >= 3) {
-      questions.push({ q: `Which character appears after ${uniqueNames[0]} in the story?`, options: [uniqueNames[1], uniqueNames[2] || 'Nobody', uniqueNames[0], 'An unnamed character'], correct: 'A' });
+      questions.push({ q: `Which character appears after ${uniqueNames[0]} in the story?`, options: [uniqueNames[1], uniqueNames[2] || 'Nobody', uniqueNames[0], 'An unnamed character'], correct: 'A', level: 'easy' });
     }
   }
-  if (locations.length) questions.push({ q: 'Where does part of this story take place?', options: [locations[0], 'In a city', 'In space', 'Underwater'], correct: 'A' });
-  if (uniqueObjects.length) questions.push({ q: 'What object is mentioned in the story?', options: [uniqueObjects[0], 'a sword', 'a map', 'a key'], correct: 'A' });
+  if (locations.length) questions.push({ q: 'Where does part of this story take place?', options: [locations[0], 'In a city', 'In space', 'Underwater'], correct: 'A', level: 'easy' });
+  if (uniqueObjects.length) questions.push({ q: 'What object is mentioned in the story?', options: [uniqueObjects[0], 'a sword', 'a map', 'a key'], correct: 'A', level: 'easy' });
 
   const actionCheck = ['found', 'discovered', 'met', 'saw', 'went', 'came', 'took', 'gave', 'made', 'ran', 'jumped', 'flew', 'fell', 'climbed', 'opened', 'closed', 'broke', 'fixed', 'helped', 'saved', 'fought', 'won', 'lost', 'died', 'lived', 'grew', 'changed', 'became', 'turned', 'returned'];
   const actionsInStory = actionCheck.filter(v => lowerText.includes(v));
-  if (actionsInStory.length) questions.push({ q: 'What action occurs in the story?', options: [`Someone ${actionsInStory[0]}`, 'Someone sleeps', 'Someone dances', 'Someone sings'], correct: 'A' });
-  if (timeRefs.length) questions.push({ q: 'When does this story take place?', options: [`During the ${timeRefs[0]}`, 'In the future', 'In ancient times', 'Time is not specified'], correct: 'A' });
-  if (emotionsFound.length) questions.push({ q: 'What emotion is expressed in the story?', options: [emotionsFound[0].charAt(0).toUpperCase() + emotionsFound[0].slice(1), 'Boredom', 'Jealousy', 'No emotions mentioned'], correct: 'A' });
+  if (actionsInStory.length) questions.push({ q: 'What action occurs in the story?', options: [`Someone ${actionsInStory[0]}`, 'Someone sleeps', 'Someone dances', 'Someone sings'], correct: 'A', level: 'easy' });
+  if (timeRefs.length) questions.push({ q: 'When does this story take place?', options: [`During the ${timeRefs[0]}`, 'In the future', 'In ancient times', 'Time is not specified'], correct: 'A', level: 'easy' });
+  if (emotionsFound.length) questions.push({ q: 'What emotion is expressed in the story?', options: [emotionsFound[0].charAt(0).toUpperCase() + emotionsFound[0].slice(1), 'Boredom', 'Jealousy', 'No emotions mentioned'], correct: 'A', level: 'easy' });
 
-  questions.push({ q: 'How does the story begin?', options: [sentences[0].length > 50 ? sentences[0].slice(0, 50) + '...' : sentences[0], 'With a battle scene', 'With a description of the weather', 'With dialogue'], correct: 'A' });
-  if (sentences.length > 1) questions.push({ q: 'How does the story end?', options: [sentences[sentences.length - 1].length > 50 ? sentences[sentences.length - 1].slice(0, 50) + '...' : sentences[sentences.length - 1], 'With everyone living happily ever after', 'With a cliffhanger', 'With a moral lesson'], correct: 'A' });
-  if (hasDialogue) questions.push({ q: 'What do characters do in this story?', options: ['They speak to each other', 'They remain silent', 'They only think', 'They only write letters'], correct: 'A' });
-  if (lowerText.includes('learn') || lowerText.includes('lesson') || lowerText.includes('realize')) questions.push({ q: 'What type of story is this?', options: ['A story with a lesson or moral', 'A pure action story', 'A romance', 'A mystery'], correct: 'A' });
-  if (lowerText.includes('but') || lowerText.includes('however') || lowerText.includes('although')) questions.push({ q: 'What kind of conflict or challenge appears in the story?', options: ['A problem that needs to be overcome', 'Everything goes smoothly', 'No challenges mentioned', 'Multiple unsolved problems'], correct: 'A' });
+  questions.push({ q: 'How does the story begin?', options: [sentences[0].length > 50 ? sentences[0].slice(0, 50) + '...' : sentences[0], 'With a battle scene', 'With a description of the weather', 'With dialogue'], correct: 'A', level: 'easy' });
+  if (sentences.length > 1) questions.push({ q: 'How does the story end?', options: [sentences[sentences.length - 1].length > 50 ? sentences[sentences.length - 1].slice(0, 50) + '...' : sentences[sentences.length - 1], 'With everyone living happily ever after', 'With a cliffhanger', 'With a moral lesson'], correct: 'A', level: 'easy' });
+  if (hasDialogue) questions.push({ q: 'What do characters do in this story?', options: ['They speak to each other', 'They remain silent', 'They only think', 'They only write letters'], correct: 'A', level: 'medium' });
+  if (lowerText.includes('learn') || lowerText.includes('lesson') || lowerText.includes('realize')) questions.push({ q: 'What type of story is this?', options: ['A story with a lesson or moral', 'A pure action story', 'A romance', 'A mystery'], correct: 'A', level: 'medium' });
+  if (lowerText.includes('but') || lowerText.includes('however') || lowerText.includes('although')) questions.push({ q: 'What kind of conflict or challenge appears in the story?', options: ['A problem that needs to be overcome', 'Everything goes smoothly', 'No challenges mentioned', 'Multiple unsolved problems'], correct: 'A', level: 'hard' });
 
   const descriptiveWords = ['beautiful', 'ugly', 'big', 'small', 'tall', 'short', 'dark', 'bright', 'mysterious', 'strange', 'magical', 'ordinary', 'special', 'dangerous', 'safe'];
   const foundDescriptive = descriptiveWords.filter(w => lowerText.includes(w));
-  if (foundDescriptive.length) questions.push({ q: 'How is something described in the story?', options: [foundDescriptive[0].charAt(0).toUpperCase() + foundDescriptive[0].slice(1), 'Boring', 'Normal', 'Not described'], correct: 'A' });
+  if (foundDescriptive.length) questions.push({ q: 'How is something described in the story?', options: [foundDescriptive[0].charAt(0).toUpperCase() + foundDescriptive[0].slice(1), 'Boring', 'Normal', 'Not described'], correct: 'A', level: 'medium' });
 
   const travelWords = ['went', 'traveled', 'journeyed', 'walked', 'ran', 'flew', 'drove', 'sailed', 'arrived', 'departed', 'left', 'came'];
   const travelFound = travelWords.filter(w => lowerText.includes(w));
-  if (travelFound.length) questions.push({ q: 'What kind of movement happens in the story?', options: [`Someone ${travelFound[0]}`, 'Everyone stays in one place', 'Only thoughts move', 'No movement occurs'], correct: 'A' });
+  if (travelFound.length) questions.push({ q: 'What kind of movement happens in the story?', options: [`Someone ${travelFound[0]}`, 'Everyone stays in one place', 'Only thoughts move', 'No movement occurs'], correct: 'A', level: 'medium' });
 
-  // Shuffle and select 5
+  // Shuffle for randomness, then prioritize questions matching the target
+  // difficulty (falling back to neighboring levels so we always get 5).
   for (let i = questions.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [questions[i], questions[j]] = [questions[j], questions[i]];
   }
-  const selected = questions.slice(0, 5);
 
-  // Fill up to 5 if needed
+  const priorityOrder = {
+    easy: ['easy', 'medium', 'hard'],
+    medium: ['medium', 'easy', 'hard'],
+    hard: ['hard', 'medium', 'easy']
+  }[difficulty] || ['medium', 'easy', 'hard'];
+
+  const selected = [];
+  for (const level of priorityOrder) {
+    for (const q of questions) {
+      if (selected.length >= 5) break;
+      if (q.level === level && !selected.includes(q)) selected.push(q);
+    }
+  }
+
+  // Fill up to 5 if the story was too short/simple for enough pool questions
   while (selected.length < 5) {
     const important = words.filter(w => w.length > 5 && w[0] === w[0].toUpperCase() && w[0] !== w[0].toLowerCase());
     if (important.length && selected.length < 5) {
-      selected.push({ q: 'Which word appears in the story?', options: [important[0], 'Elephant', 'Computer', 'Spaceship'], correct: 'A' });
+      selected.push({ q: 'Which word appears in the story?', options: [important[0], 'Elephant', 'Computer', 'Spaceship'], correct: 'A', level: 'easy' });
     }
     if (selected.length < 5) {
-      selected.push({ q: 'What is this story NOT about?', options: ['Aliens from Mars', uniqueNames[0] || 'A character', uniqueObjects[0] || 'An event', 'The events described'], correct: 'A' });
+      selected.push({ q: 'What is this story NOT about?', options: ['Aliens from Mars', uniqueNames[0] || 'A character', uniqueObjects[0] || 'An event', 'The events described'], correct: 'A', level: 'hard' });
     }
     if (selected.length < 5) {
       let setting = 'specific location';
       if (lowerText.includes('forest') || lowerText.includes('tree')) setting = 'nature';
       else if (lowerText.includes('city') || lowerText.includes('building') || lowerText.includes('street')) setting = 'urban area';
       else if (lowerText.includes('house') || lowerText.includes('home') || lowerText.includes('room')) setting = 'indoor location';
-      selected.push({ q: 'Where might this story take place?', options: [`In a ${setting}`, 'On the moon', 'Under the ocean', 'In outer space'], correct: 'A' });
+      selected.push({ q: 'Where might this story take place?', options: [`In a ${setting}`, 'On the moon', 'Under the ocean', 'In outer space'], correct: 'A', level: 'medium' });
     }
     if (selected.length < 5) {
-      selected.push({ q: 'What is the purpose of this story?', options: ['To tell a story', 'To sell a product', 'To provide instructions', 'To list facts'], correct: 'A' });
+      selected.push({ q: 'What is the purpose of this story?', options: ['To tell a story', 'To sell a product', 'To provide instructions', 'To list facts'], correct: 'A', level: 'hard' });
     }
   }
 
@@ -320,6 +343,28 @@ function formatQuizQuestions(questions) {
   return quiz.trimEnd();
 }
 
+// Looks at the user's last 3 completed attempts to decide the difficulty
+// for their NEXT quiz. DB-dependent, so it stays here rather than in
+// difficulty.js (which only holds the pure, unit-testable rule logic).
+async function getNextDifficulty(username) {
+  const recentAttempts = await db.collection('quiz_results')
+    .find({ username })
+    .sort({ date: -1 })
+    .limit(3)
+    .toArray();
+
+  if (recentAttempts.length === 0) return { previousDifficulty: 'medium', nextDifficulty: 'medium' };
+
+  // Older documents were created before this feature existed, so they
+  // have no difficulty field — treat them as medium (the cold-start default).
+  const previousDifficulty = recentAttempts[0].difficulty || 'medium';
+  const scoredAttempts = recentAttempts.filter(r => r.score != null);
+  const avgScore = computeAverageScore(scoredAttempts);
+  const nextDifficulty = decideDifficulty(previousDifficulty, avgScore);
+
+  return { previousDifficulty, nextDifficulty };
+}
+
 // ========== ROUTES ==========
 
 function registerRoutes() {
@@ -386,17 +431,26 @@ app.post('/api/generate', loginRequired, async (req, res) => {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: 'No input received.' });
 
-    const result = await generateFreeResponse(text);
+    const { previousDifficulty, nextDifficulty } = await getNextDifficulty(req.session.username);
+    const result = await generateFreeResponse(text, nextDifficulty);
 
     const quizResult = await db.collection('quiz_results').insertOne({
       username: req.session.username,
       story: text,
       summary: result,
       score: null,
+      totalQuestions: 5, // every generator above always produces exactly 5 questions
+      difficulty: nextDifficulty,
       date: getISTTime()
     });
 
-    res.json({ result, quiz_id: quizResult.insertedId.toString() });
+    res.json({
+      result,
+      quiz_id: quizResult.insertedId.toString(),
+      difficulty: nextDifficulty,
+      previousDifficulty,
+      difficultyChanged: nextDifficulty !== previousDifficulty
+    });
   } catch (e) {
     console.error('Generate error:', e);
     res.status(500).json({ error: e.message });

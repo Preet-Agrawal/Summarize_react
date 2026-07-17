@@ -3,10 +3,6 @@
   background: linear-gradient(135deg, #825ee4 0%, #5e72e4 100%);
 }
 
-.register-left .feature-list li::before {
-  content: '✨';
-}
-
 .password-strength {
   margin-top: 0.5rem;
   height: 4px;

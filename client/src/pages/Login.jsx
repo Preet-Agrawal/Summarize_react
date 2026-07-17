@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import Navbar from '../components/Navbar'
 import './Login.css'
 
 export default function Login() {
@@ -23,6 +24,8 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      <Navbar />
+      <div className="auth-page-content">
       <div className="auth-container">
         <div className="auth-left">
           <h1>Welcome Back!</h1>
@@ -93,6 +96,7 @@ export default function Login() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   )
