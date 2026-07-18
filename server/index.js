@@ -8,6 +8,11 @@ const nodemailer = require('nodemailer');
 const { computeAverageScore, decideDifficulty } = require('./difficulty');
 require('dotenv').config({ path: '../.env' });
 
+if (!process.env.SECRET_KEY) {
+  console.error('FATAL: SECRET_KEY is not set in your .env file. Refusing to start with an insecure default — set SECRET_KEY before running the server.');
+  process.exit(1);
+}
+
 const app = express();
 const PORT = process.env.PORT || 5001;
 
@@ -28,7 +33,7 @@ app.use(cors({
 
 function setupSession() {
   app.use(session({
-    secret: process.env.SECRET_KEY || 'dev-secret-key-change-in-production',
+    secret: process.env.SECRET_KEY,
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: mongoUri }),
@@ -437,7 +442,7 @@ app.post('/api/generate', loginRequired, async (req, res) => {
     const quizResult = await db.collection('quiz_results').insertOne({
       username: req.session.username,
       story: text,
-      summary: result,
+      content: result, // holds the full "SUMMARY:...\n\nQUIZ:..." blob, not just the summary
       score: null,
       totalQuestions: 5, // every generator above always produces exactly 5 questions
       difficulty: nextDifficulty,
