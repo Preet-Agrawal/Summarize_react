@@ -1,3 +1,4 @@
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const session = require('express-session');
@@ -544,6 +545,18 @@ app.post('/api/contact', async (req, res) => {
     console.error('Contact error:', e);
     res.status(500).json({ error: 'Server error.' });
   }
+});
+
+// Serve the built React app (client/dist) so this single service can host
+// both the API and the frontend on one origin — no separate static host needed.
+const clientDistPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientDistPath));
+
+// SPA fallback: any non-API route (e.g. /register, /profile) should load
+// index.html so React Router can handle it client-side.
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found.' });
+  res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 
 }
