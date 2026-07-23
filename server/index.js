@@ -375,7 +375,17 @@ function registerRoutes() {
   if (routesRegistered) return;
   routesRegistered = true;
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+// Pings Mongo so uptime monitors (e.g. UptimeRobot) catch a dead DB
+// connection, not just "the Node process is still running".
+app.get('/api/health', async (req, res) => {
+  try {
+    if (!db) throw new Error('database not connected');
+    await db.command({ ping: 1 });
+    res.json({ status: 'ok' });
+  } catch (e) {
+    res.status(503).json({ status: 'error', error: 'database unreachable' });
+  }
+});
 
 // Auth: check the current JWT and return the fresh user (never trust the
 // token payload itself for anything beyond the id).

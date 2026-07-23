@@ -146,7 +146,7 @@ export default function Contact() {
       </div>
 
       <div className="footer">
-        <p>&copy; 2024 Story Quiz. Made with care by IIIT Surat Students</p>
+        <p>Built by Preet Kumar · IIIT Surat</p>
       </div>
     </div>
   )
