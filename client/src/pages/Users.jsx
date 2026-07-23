@@ -4,17 +4,18 @@ import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
 
 export default function Users() {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const navigate = useNavigate()
   const [users, setUsers] = useState([])
 
   useEffect(() => {
+    if (loading) return // wait for the /me check to resolve before deciding to redirect
     if (!user) { navigate('/login'); return }
     fetch('/api/users', { credentials: 'include' })
       .then(res => res.json())
       .then(data => setUsers(data.users || []))
       .catch(() => navigate('/login'))
-  }, [user, navigate])
+  }, [user, loading, navigate])
 
   return (
     <>

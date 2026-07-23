@@ -34,7 +34,7 @@ export default function Register() {
     if (password !== confirm) { setError('Passwords do not match.'); return }
     try {
       await registerUser(username, password)
-      navigate('/login')
+      navigate('/')
     } catch (err) {
       setError(err.message)
     }

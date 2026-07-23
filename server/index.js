@@ -1,16 +1,17 @@
 const path = require('path');
 const express = require('express');
 const cors = require('cors');
-const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const cookieParser = require('cookie-parser');
 const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const { computeAverageScore, decideDifficulty } = require('./difficulty');
+const { sign } = require('./utils/jwt');
+const auth = require('./middleware/auth');
 require('dotenv').config({ path: '../.env' });
 
-if (!process.env.SECRET_KEY) {
-  console.error('FATAL: SECRET_KEY is not set in your .env file. Refusing to start with an insecure default — set SECRET_KEY before running the server.');
+if (!process.env.JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not set in your .env file. Refusing to start with an insecure default — set JWT_SECRET before running the server.');
   process.exit(1);
 }
 
@@ -27,36 +28,33 @@ let routesRegistered = false;
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true
 }));
 
-function setupSession() {
-  app.use(session({
-    secret: process.env.SECRET_KEY,
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: mongoUri }),
-    cookie: {
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
-      httpOnly: true,
-      sameSite: 'lax'
-    }
-  }));
-}
+// Options for the JWT cookie. Logout must clear the cookie with this exact
+// same set of options, otherwise the browser treats it as a different
+// cookie and won't remove it (this bites people in production especially,
+// since secure/sameSite differ there).
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+  maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
+};
 
 // IST timezone helper
 function getISTTime() {
   return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
 }
 
-// Auth middleware
-function loginRequired(req, res, next) {
-  if (!req.session.username) {
-    return res.status(401).json({ error: 'Please log in to access this page.' });
-  }
-  next();
+// Fetches the current user straight from the DB by id — the JWT payload
+// only carries the id, never username/email, so callers that need those
+// fields must look them up fresh rather than trusting the token.
+async function getUserById(id) {
+  return db.collection('users').findOne({ _id: new ObjectId(id) });
 }
 
 // Email transporter
@@ -379,12 +377,11 @@ function registerRoutes() {
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-// Auth: check session
-app.get('/api/auth/me', (req, res) => {
-  if (req.session.username) {
-    return res.json({ username: req.session.username });
-  }
-  res.json({ username: null });
+// Auth: check the current JWT and return the fresh user (never trust the
+// token payload itself for anything beyond the id).
+app.get('/api/auth/me', auth, async (req, res) => {
+  const user = await getUserById(req.user.id);
+  res.json({ username: user ? user.username : null });
 });
 
 // Register
@@ -398,8 +395,12 @@ app.post('/api/auth/register', async (req, res) => {
     if (existing) return res.status(400).json({ error: 'Username already exists.' });
 
     const hashed = await bcrypt.hash(password, 10);
-    await db.collection('users').insertOne({ username, password: hashed, created_at: getISTTime() });
-    res.json({ message: 'Registration successful! Please log in.' });
+    const created_at = getISTTime();
+    const { insertedId } = await db.collection('users').insertOne({ username, password: hashed, created_at });
+
+    const token = sign({ _id: insertedId });
+    res.cookie('token', token, cookieOptions);
+    res.json({ message: 'Registration successful!', username, created_at });
   } catch (e) {
     console.error('Register error:', e);
     res.status(500).json({ error: 'Server error.' });
@@ -417,8 +418,9 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid username or password.' });
     }
 
-    req.session.username = username;
-    res.json({ message: 'Logged in successfully!', username });
+    const token = sign(user);
+    res.cookie('token', token, cookieOptions);
+    res.json({ message: 'Logged in successfully!', username: user.username, created_at: user.created_at });
   } catch (e) {
     console.error('Login error:', e);
     res.status(500).json({ error: 'Server error.' });
@@ -427,21 +429,27 @@ app.post('/api/auth/login', async (req, res) => {
 
 // Logout
 app.post('/api/auth/logout', (req, res) => {
-  req.session.destroy();
+  // httpOnly/secure/sameSite must match the cookie as it was set, or the
+  // browser won't recognize this as the same cookie. maxAge is deliberately
+  // left out — Express uses it to recompute expires, which overrides the
+  // immediate-expiry default clearCookie relies on to actually clear it.
+  const { maxAge, ...clearOptions } = cookieOptions;
+  res.clearCookie('token', clearOptions);
   res.json({ message: 'Logged out successfully.' });
 });
 
 // Generate quiz
-app.post('/api/generate', loginRequired, async (req, res) => {
+app.post('/api/generate', auth, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text) return res.status(400).json({ error: 'No input received.' });
 
-    const { previousDifficulty, nextDifficulty } = await getNextDifficulty(req.session.username);
+    const user = await getUserById(req.user.id);
+    const { previousDifficulty, nextDifficulty } = await getNextDifficulty(user.username);
     const result = await generateFreeResponse(text, nextDifficulty);
 
     const quizResult = await db.collection('quiz_results').insertOne({
-      username: req.session.username,
+      username: user.username,
       story: text,
       content: result, // holds the full "SUMMARY:...\n\nQUIZ:..." blob, not just the summary
       score: null,
@@ -464,13 +472,14 @@ app.post('/api/generate', loginRequired, async (req, res) => {
 });
 
 // Save score
-app.post('/api/save_score', loginRequired, async (req, res) => {
+app.post('/api/save_score', auth, async (req, res) => {
   try {
     const { score, quiz_id } = req.body;
     if (score == null || !quiz_id) return res.status(400).json({ error: 'Missing score or quiz_id.' });
 
+    const user = await getUserById(req.user.id);
     await db.collection('quiz_results').updateOne(
-      { _id: new ObjectId(quiz_id), username: req.session.username },
+      { _id: new ObjectId(quiz_id), username: user.username },
       { $set: { score } }
     );
     res.json({ success: true });
@@ -481,14 +490,14 @@ app.post('/api/save_score', loginRequired, async (req, res) => {
 });
 
 // Profile
-app.get('/api/profile', loginRequired, async (req, res) => {
+app.get('/api/profile', auth, async (req, res) => {
   try {
     const user = await db.collection('users').findOne(
-      { username: req.session.username },
+      { _id: new ObjectId(req.user.id) },
       { projection: { _id: 0, username: 1, created_at: 1 } }
     );
     const quizResults = await db.collection('quiz_results')
-      .find({ username: req.session.username })
+      .find({ username: user.username })
       .sort({ date: -1 })
       .toArray();
 
@@ -501,7 +510,7 @@ app.get('/api/profile', loginRequired, async (req, res) => {
 });
 
 // Users list
-app.get('/api/users', loginRequired, async (req, res) => {
+app.get('/api/users', auth, async (req, res) => {
   try {
     const users = await db.collection('users')
       .find({}, { projection: { _id: 0, username: 1 } })
@@ -572,7 +581,6 @@ async function start() {
       console.log('Data is cleared when the server stops. Set MONGO_URI in .env for a permanent database.');
     }
 
-    setupSession();
     registerRoutes();
 
     client = new MongoClient(mongoUri);

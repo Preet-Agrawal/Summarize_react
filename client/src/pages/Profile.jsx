@@ -5,12 +5,13 @@ import Navbar from '../components/Navbar'
 import './Profile.css'
 
 export default function Profile() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const [profileData, setProfileData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (authLoading) return // wait for the /me check to resolve before deciding to redirect
     if (!user) { navigate('/login'); return }
     fetch('/api/profile', { credentials: 'include' })
       .then(res => {
@@ -19,7 +20,7 @@ export default function Profile() {
       })
       .then(data => { setProfileData(data); setLoading(false) })
       .catch(() => { navigate('/login') })
-  }, [user, navigate])
+  }, [user, authLoading, navigate])
 
   if (loading) return <div className="profile-page"><Navbar /><p style={{textAlign:'center',padding:'3rem'}}>Loading...</p></div>
   if (!profileData) return null
